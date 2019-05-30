@@ -10,10 +10,13 @@
   "main": "app.js",
   "dependencies": {
     "express": "~4.2.0",
-    "socket.io": "~1.0.0"
+    "ws": "^7.0.0"
   },
   "devDependencies": {},
-  "optionalDependencies": {},
+  "optionalDependencies": {
+    "bufferutil": "^4.0.1",
+    "utf-8-validate": "^5.0.2"
+  },
   "engines": {
     "node": "0.10.x"
   }

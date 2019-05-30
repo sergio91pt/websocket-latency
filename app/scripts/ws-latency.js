@@ -1,29 +1,27 @@
-//var ctx = $("#latencyChart").get(0).getContext("2d");
 
-var socket = io.connect(document.location.host);
+var socket = new WebSocket('ws://' + location.host);
+socket.binaryType = 'arraybuffer';
 
 var interval = 100;
 var pingCount = 100;
 var wsPings = [];
-var httpPings = [];
 
-socket.on('connect', function() {
+var len = 100000; // 100K
+var buffer = new ArrayBuffer(len);
+var arrayBuffer = new Uint8Array(buffer);
 
-    //Listen pong message
-    socket.on('pong', function (idx) {
-        wsPings[idx].stop = new Date().getTime();
-    });
+for (var i = 0; i < len; i += 1) {
+  arrayBuffer[i] = i;
+}
 
+socket.onmessage = function(evt) {
+    const idx = Number.parseInt(evt.data, 10);
+    wsPings[idx].stop = window.performance.now();
+}
 
-});
-
-var displayResults = function(wsPings, httpPings){
+var displayResults = function(wsPings){
 
     var wsLatencies = wsPings.map(function(data){
-        return data.stop - data.start;
-    });
-
-    var httpLatencies = httpPings.map(function(data){
         return data.stop - data.start;
     });
 
@@ -32,26 +30,17 @@ var displayResults = function(wsPings, httpPings){
     var wsSum = wsLatencies.reduce(function(a, b) { return a + b; });
     var wsAvg = wsSum / wsLatencies.length;
 
-    var httpMin = httpLatencies.reduce(function(a, b) { return Math.min(a,b); });
-    var httpMax = httpLatencies.reduce(function(a, b) { return Math.max(a,b); });
-    var httpSum = httpLatencies.reduce(function(a, b) { return a + b; });
-    var httpAvg = httpSum / httpLatencies.length;
-
     console.log('wsMin : ' + wsMin);
     console.log('wsMax : ' + wsMax);
     console.log('wsAvg : ' + wsAvg);
 
-    console.log('httpMin : ' + httpMin);
-    console.log('httpMax : ' + httpMax);
-    console.log('httpAvg : ' + httpAvg);
-
-    $('#minLatency')[0].innerHTML = 'Min : ' + wsMin + '/' + httpMin;
-    $('#maxLatency')[0].innerHTML = 'Max : ' + wsMax + '/' + httpMax;
-    $('#avgLatency')[0].innerHTML = 'Average : ' + wsAvg + '/' + httpAvg;
+    $('#minLatency')[0].innerHTML = 'Min : ' + wsMin + 'ms';
+    $('#maxLatency')[0].innerHTML = 'Max : ' + wsMax + 'ms';
+    $('#avgLatency')[0].innerHTML = 'Average : ' + wsAvg + 'ms';
 
     var i = 1;
     var latenciesData = wsLatencies.map(function(data){
-        result = [i, data, httpLatencies[i -1]];
+        result = [i, data];
         i++;
         return result;
     });
@@ -59,7 +48,7 @@ var displayResults = function(wsPings, httpPings){
     g2 = new Dygraph(document.getElementById("graph"),
         latenciesData,
         {
-            labels: [ "x", "Websocket latency", "Http latency" ]
+            labels: [ "x", "Websocket latency (ms)" ]
         });
 
 };
@@ -71,7 +60,6 @@ var runTest = function () {
     $("#knob").removeClass('hide');
 
     wsPings = [];
-    httpPings = [];
     var i = 0;
 
     //Send ping message every 100ms
@@ -89,7 +77,7 @@ var runTest = function () {
 
                 $('#graph').removeClass('hide');
 
-                displayResults(wsPings, httpPings);
+                displayResults(wsPings);
 
                 $('.btn').prop('disabled', false);
 
@@ -105,14 +93,10 @@ var runTest = function () {
 
             //Send ping
             wsPings[i] = {};
-            wsPings[i].start = new Date().getTime();
-            socket.emit('ping', i);
+            wsPings[i].start = window.performance.now();
 
-            httpPings[i] = {};
-            httpPings[i].start = new Date().getTime();
-            $.get('/ping', { 'index' : i }, function(data){
-              httpPings[data.index].stop = new Date().getTime();
-            })
+            arrayBuffer[0] = i;
+            socket.send(buffer);
 
             i++;
         }
